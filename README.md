@@ -1,7 +1,8 @@
 # MACS_tools
 Tools for handling DLR MACS (Modular Aerial Camera System) data
 
-
+### fill_footprints.ipynb
+#### Create footprint (shape)files from MACS projects
 Step 1:
 Open Mosaica
 
