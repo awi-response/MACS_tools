@@ -1,0 +1,10 @@
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - gdal
+  - geopandas
+  - jupyter
+  - notebook
+  - pandas
+  - python=3.7
