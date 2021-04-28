@@ -127,7 +127,7 @@ _Version: 2021-04-27 Authors: Tabea Rettelbach, Jennika Hammar, Ingmar Nitze_
 
 ### Part 4: Processing in Pix4Dmapper
 
-1. Launch Pix4Dmapper (you'll need a licence for this. If you don`t have access yet, contact Ingmar Nitze for more info: [ingmar.nitze@awi.de](mailto:ingmar.nitze@awi.de))
+1. Launch Pix4Dmapper (you'll need a licence for this. If you don't have access yet, contact Ingmar Nitze for more info.
     1. New Project &gt; Name: `your_project_name` &gt; Create in: `.../04_pix4d` &gt; Project Type: New Project &gt; Next
     2. Add Directories &gt; navigate to `.../01_rawdata/macs` &gt; select NIR, Right, or Left folder &gt; Choose (repeat if multiple directories should be added)
     3. Next
