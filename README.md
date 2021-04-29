@@ -153,9 +153,9 @@ _Version: 2021-04-27 Authors: Tabea Rettelbach, Jennika Hammar, Ingmar Nitze_
     7. Continue with step 4-1f &gt; OK
 4. Prepare for the actual processing:
     1. Lower left corner: Processing Options &gt; Select which processing steps you'd like to run.
-        1. Initial Processing: Here, the program does…
+        1. Initial Processing: Here, automatic tie points between images are created (and a bunch of other stuff is happening)
         2. Point Cloud and Mesh: Here, Pix4Dmapper generates a point cloud of the photogrammetrically matched images.
-        3. DSM, Orthomosaic and Index: The final digital surface model and orthomosaic of the images are created here.
+        3. DSM, Orthomosaic and Index: The final digital surface model and orthomosaic of the images are created here (and whatever else you selected during the processing setup).
         > Note: Step 1. Initial Processing is the most compute expensive and will take the longest. This processing step is also the bottleneck for project sizes. So with large projects, it's best to divide the study area into smaller subsets, do the initial processing for all subsets separately and then only combine them afterwards to continue with steps 2. and 3. Info on how to do the subsetting and re-matching can be found here:
     2. You can now do some finetuning of your project settings and select whatever you desire to get in your output (or stick with the default settings).
     > Tip: If you plan on processing multiple datasets, and potentially comparing them in further analysis, we recommend to set the output resolution manually (and to the same values throughout all projects)
