@@ -8,6 +8,8 @@ import pandas as pd
 from pathlib import Path
 import geopandas as gpd
 from skimage import morphology
+from joblib import delayed, Parallel
+from scipy.stats import linregress
 
 
 def prepare_df_for_mipps2(path_footprints, path_infiles):
@@ -69,3 +71,66 @@ def mask_and_tag(image, mask, tag=None):
     os.system(f'gdal_translate -a_nodata 0 {str(image)} {str(newimage)}')
     os.remove(str(image))
     shutil.move(str(newimage), str(image))
+
+# SCALING functions
+def rescale(array, minimum, maximum, dtype=np.uint16, gain=1.):
+    x = [0, 2**16-1]
+    y = [minimum, maximum]
+    slope, intercept, r_value, p_value, std_err = linregress(y,x)
+    #print(slope,intercept)
+    D = (array * gain) *slope + intercept
+    D_round = np.around(np.clip(D, 1, 2**16-1))
+    return np.array(D_round, np.uint16)
+    
+def write_new_values(image, minimum, maximum, shutter_factor=1, tag=True):
+    with rasterio.open(image, mode='r+')as src:
+        data = src.read()
+        datanew = rescale(data, minimum, maximum, gain=shutter_factor)
+        src.write(datanew)
+        if tag:
+            src.update_tags(VALUE_STRETCH_MINIMUM=minimum, VALUE_STRETCH_MAXIMUM=maximum)
+
+def read_stats(image):
+    with rasterio.open(image) as src:
+        a = src.read()
+        return a.mean(), a.min(), a.max(), a.std()
+
+def read_stats_extended(image):
+    with rasterio.open(image) as src:
+        a = src.read()
+        return a.mean(), a.min(), a.max(), a.std(), np.percentile(a, 1), np.percentile(a, 99)
+
+
+def get_image_stats_multi(OUTDIR, sensors, n_jobs=40, nth_images=1, quiet=False):
+    dfs = []
+    for sensor in sensors:
+        images = list(OUTDIR[sensor].glob('*.tif'))[::nth_images]
+        if quiet:
+            stats = Parallel(n_jobs=n_jobs)(delayed(read_stats_extended)(image) for image in images)
+        else:
+            stats = Parallel(n_jobs=n_jobs)(delayed(read_stats_extended)(image) for image in tqdm.tqdm_notebook(images))
+        #stats = [read_stats_extended(image) for image in tqdm.tqdm_notebook(images)]
+        df_stats = pd.DataFrame(data=np.array(stats), columns=['mean', 'min', 'max', 'std', 'p01', 'p99'])
+        df_stats['image'] = images
+        df_stats['sensor'] = sensor
+        dfs.append(df_stats)
+    df = pd.concat(dfs)
+    return df
+
+
+def get_shutter_factor(OUTDIR, sensors):
+    """
+    get shutter ratio between RGB and NIR. scaling factor for RGB (>1 = increase in values) 
+    """
+    shutter = {}
+    for sensor in sensors:
+        images = list(OUTDIR[sensor].glob('*.tif'))
+        f = images[0]
+        shutter[sensor] = int(f.stem.split('_')[-1])
+    if ('right' in sensors) and ('nir' in sensors):
+        factor = shutter['nir'] / shutter['right']
+    elif ('left' in sensors) and ('nir' in sensors):
+        factor = shutter['nir'] / shutter['left']
+    else:
+        factor = 1
+    return factor
