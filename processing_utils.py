@@ -8,6 +8,8 @@ import pandas as pd
 from pathlib import Path
 import geopandas as gpd
 from skimage import morphology
+from joblib import delayed, Parallel
+from scipy.stats import linregress
 
 
 def prepare_df_for_mipps2(path_footprints, path_infiles):
@@ -72,10 +74,13 @@ def mask_and_tag(image, mask, tag=None):
 
 # SCALING functions
 def rescale(array, minimum, maximum, dtype=np.uint16, gain=1.):
-    factor = 2**16 / maximum
-    out = (array - minimum) / (maximum - minimum) * factor * maximum * gain
-    out2 = out.round()
-    return np.array(np.around(np.clip(out2, 1, (2**16)-1)), dtype=dtype) 
+    x = [0, 2**16-1]
+    y = [minimum, maximum]
+    slope, intercept, r_value, p_value, std_err = linregress(y,x)
+    #print(slope,intercept)
+    D = (array * gain) *slope + intercept
+    D_round = np.around(np.clip(D, 1, 2**16-1))
+    return np.array(D_round, np.uint16)
     
 def write_new_values(image, minimum, maximum, shutter_factor=1, tag=True):
     with rasterio.open(image, mode='r+')as src:
