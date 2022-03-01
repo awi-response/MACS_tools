@@ -10,6 +10,7 @@ import geopandas as gpd
 from skimage import morphology
 from joblib import delayed, Parallel
 from scipy.stats import linregress
+import tqdm
 
 # Functions for MACS to TIF
 
@@ -144,7 +145,7 @@ def get_shutter_factor(OUTDIR, sensors):
 
 def get_overlapping_ds(aoi_path, projects_file, parent_dir):
     #Open Projects file and AOI
-    aoi = gpd.read_file(AOI).to_crs(epsg=4326)
+    aoi = gpd.read_file(aoi_path).to_crs(epsg=4326)
     datasets = gpd.read_file(projects_file).to_crs(epsg=4326)
     overlapping_ds = gpd.sjoin(datasets, aoi)
     return overlapping_ds
@@ -167,3 +168,19 @@ def get_dataset_name(ds, dataset_id, name_attribute='Dataset'):
     except:
         dataset_name = ds.loc[dataset_id][name_attribute]
     return dataset_name
+    
+    
+def get_dataset_stats(datasets_file, parent_dir, aoi, name_attribute='Dataset'):
+    grp = []
+    idxs = datasets_file[name_attribute].index
+    for idx in idxs:
+        dataset_name = datasets_file[name_attribute].loc[idx]
+        footprints = retrieve_footprints(datasets_file, idx, parent_dir, aoi)
+        stats = footprints.groupby(by='Looking').count().iloc[:,0].T
+        grp.append(stats.rename(dataset_name))
+    stats = pd.concat(grp, axis=1).T
+    stats['total_images'] = stats[['center', 'left', 'right']].sum(axis=1)
+    stats['dataset_id'] = idxs
+    stats[name_attribute] = stats.index
+    stats = stats.set_index('dataset_id', drop=True)
+    return stats
