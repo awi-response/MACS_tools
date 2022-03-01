@@ -10,7 +10,9 @@ import geopandas as gpd
 from skimage import morphology
 from joblib import delayed, Parallel
 from scipy.stats import linregress
+import tqdm
 
+# Functions for MACS to TIF
 
 def prepare_df_for_mipps2(path_footprints, path_infiles):
     # Load filtered footprints files
@@ -44,6 +46,8 @@ def write_exif(outdir, tag, exifpath):
     print(s)
     os.system(s)
     
+# Functions for image cropping and masking
+
 def make_mask(shape, disksize=4864):
     
     dsk = morphology.disk((disksize-1)/2)
@@ -71,6 +75,7 @@ def mask_and_tag(image, mask, tag=None):
     os.system(f'gdal_translate -a_nodata 0 {str(image)} {str(newimage)}')
     os.remove(str(image))
     shutil.move(str(newimage), str(image))
+
 
 # SCALING functions
 def rescale(array, minimum, maximum, dtype=np.uint16, gain=1.):
@@ -134,3 +139,48 @@ def get_shutter_factor(OUTDIR, sensors):
     else:
         factor = 1
     return factor
+    
+    
+# Functions for footprints creation 
+
+def get_overlapping_ds(aoi_path, projects_file, parent_dir):
+    #Open Projects file and AOI
+    aoi = gpd.read_file(aoi_path).to_crs(epsg=4326)
+    datasets = gpd.read_file(projects_file).to_crs(epsg=4326)
+    overlapping_ds = gpd.sjoin(datasets, aoi)
+    return overlapping_ds
+
+def retrieve_footprints(overlapping_ds, project_id, parent_data_dir, aoi_file, fp_file_regex='*full.shp', name_attribute='Dataset'):
+    try:
+        project_name = overlapping_ds.loc[project_id][name_attribute]
+    except:
+        project_name = overlapping_ds.loc[int(project_id)][name_attribute]
+    footprints = list((parent_data_dir / project_name).glob(fp_file_regex))[0]
+    fp = gpd.read_file(footprints).to_crs(epsg=4326)
+    aoi = gpd.read_file(aoi_file).to_crs(epsg=4326)
+    
+    fp_selection = gpd.sjoin(fp, aoi)
+    return fp_selection
+    
+def get_dataset_name(ds, dataset_id, name_attribute='Dataset'):
+    try:
+        dataset_name = ds.loc[int(dataset_id)][name_attribute]
+    except:
+        dataset_name = ds.loc[dataset_id][name_attribute]
+    return dataset_name
+    
+    
+def get_dataset_stats(datasets_file, parent_dir, aoi, name_attribute='Dataset'):
+    grp = []
+    idxs = datasets_file[name_attribute].index
+    for idx in idxs:
+        dataset_name = datasets_file[name_attribute].loc[idx]
+        footprints = retrieve_footprints(datasets_file, idx, parent_dir, aoi)
+        stats = footprints.groupby(by='Looking').count().iloc[:,0].T
+        grp.append(stats.rename(dataset_name))
+    stats = pd.concat(grp, axis=1).T
+    stats['total_images'] = stats[['center', 'left', 'right']].sum(axis=1)
+    stats['dataset_id'] = idxs
+    stats[name_attribute] = stats.index
+    stats = stats.set_index('dataset_id', drop=True)
+    return stats
