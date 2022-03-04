@@ -146,8 +146,9 @@ def get_shutter_factor(OUTDIR, sensors):
 def get_overlapping_ds(aoi_path, projects_file, parent_dir):
     #Open Projects file and AOI
     aoi = gpd.read_file(aoi_path).to_crs(epsg=4326)
+    if 'Dataset' in aoi.columns: aoi.drop(columns=['Dataset'], inplace=True)
     datasets = gpd.read_file(projects_file).to_crs(epsg=4326)
-    overlapping_ds = gpd.sjoin(datasets, aoi)
+    overlapping_ds = gpd.sjoin(datasets, aoi, lsuffix='', how='inner')
     return overlapping_ds
 
 def retrieve_footprints(overlapping_ds, project_id, parent_data_dir, aoi_file, fp_file_regex='*full.shp', name_attribute='Dataset'):
