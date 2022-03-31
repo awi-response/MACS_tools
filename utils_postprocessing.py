@@ -1,9 +1,24 @@
-import pandas as pd
+import numpy as np
 import os
-#from pathlib import Path
+import pandas as pd
+import rasterio
 
 
 def flist_to_df(filelist):
+    """
+    Create pandas DataFrame with information parsed from filelist
+
+    Parameters
+    ----------
+    filelist : list
+        file list of MACS Orthomosaic Output files
+
+    Returns
+    -------
+    df : TYPE
+        DESCRIPTION.
+
+    """
     sensors = []
     rows = []
     cols = []
@@ -57,14 +72,61 @@ def stack_output(outmosaic, rgbfile, nirfile, remove_temporary_files=True):
             
 
 def calculate_pyramids(rasterfile):
+    """
+    Function to calculate pyramids
+
+    Parameters
+    ----------
+    rasterfile : Path
+        file for which to create pyramids
+
+    Returns
+    -------
+    None.
+
+    """
     addo = f'gdaladdo -ro --config COMPRESS_OVERVIEW DEFLATE --config GDAL_NUM_THREADS ALL_CPUS {rasterfile}'
     os.system(addo)
 
 
-def full_postprocessing(df, tile_id):
+def mask_and_name_bands(mosaic_file):
+    """
+    Function to mask incomplete spectral data (e.g. with only NIR data and no RGB and vice versa)
+    Add names to Bands
+    """
+    with rasterio.open(mosaic_file, 'r+') as src:
+        src.profile['nodata'] = 0
+        data = src.read()
+        newmask = ~(data == 0).any(axis=0)
+        newmask_write = np.r_[src.count * [newmask]]
+        data_masked = data * newmask_write
+        src.set_band_description(1, 'MACS Blue Band')
+        src.set_band_description(2, 'MACS Green Band')
+        src.set_band_description(3, 'MACS Red Band')
+        src.set_band_description(4, 'MACS NIR Band')
+        src.write(data_masked)
+
+
+def full_postprocessing_optical(df, tile_id, rgb_name='group1', nir_name='nir'):
+    """
+    Wrapper function to sequentially run
+
+    Parameters
+    ----------
+    df : TYPE
+        DESCRIPTION.
+    tile_id : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
     subset = df[df['tile_id'] == tile_id]
-    rgbfile = subset.query('sensor=="group1"').filename.values[0]
-    nirfile = subset.query('sensor=="nir"').filename.values[0]
+    rgbfile = subset.query(f'sensor=="{rgb_name}"').filename.values[0]
+    nirfile = subset.query(f'sensor=="{nir_name}"').filename.values[0]
     outmosaic = rgbfile.parent / f'mosaic_{tile_id}.tif'
     stack_output(outmosaic, rgbfile, nirfile, remove_temporary_files=True)
     calculate_pyramids(outmosaic)
+    mask_and_name_bands(outmosaic)
